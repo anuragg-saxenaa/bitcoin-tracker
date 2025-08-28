@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Moon, Sun, TrendingUp, TrendingDown, DollarSign, BarChart3 } from 'lucide-react';
+import { Moon, Sun, DollarSign, BarChart3 } from 'lucide-react';
 import BitcoinPrice from './components/BitcoinPrice';
 import PriceChart from './components/PriceChart';
 import StatsCards from './components/StatsCards';
