@@ -9,6 +9,10 @@ class BitcoinService {
   constructor() {
     this.stompClient = null;
     this.connected = false;
+    this.reconnectTimer = null;
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 10;
+    this.baseReconnectDelay = 1000; // 1 second
   }
 
   // REST API calls
@@ -56,6 +60,13 @@ class BitcoinService {
         (frame) => {
           console.log('Connected to WebSocket:', frame);
           this.connected = true;
+          this.reconnectAttempts = 0; // Reset reconnection attempts on successful connection
+          
+          // Clear any existing reconnect timer
+          if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+          }
           
           // Subscribe to Bitcoin price updates
           this.stompClient.subscribe('/topic/bitcoin-price', (message) => {
@@ -74,13 +85,7 @@ class BitcoinService {
             onDisconnect();
           }
           
-          // Attempt to reconnect after 5 seconds
-          setTimeout(() => {
-            if (!this.connected) {
-              console.log('Attempting to reconnect...');
-              this.connect(onPriceUpdate, onDisconnect);
-            }
-          }, 5000);
+          this.scheduleReconnect(onPriceUpdate, onDisconnect);
         }
       );
     } catch (error) {
@@ -88,15 +93,52 @@ class BitcoinService {
       if (onDisconnect) {
         onDisconnect();
       }
+      this.scheduleReconnect(onPriceUpdate, onDisconnect);
     }
   }
 
+  scheduleReconnect(onPriceUpdate, onDisconnect) {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('Maximum reconnection attempts reached. Giving up.');
+      return;
+    }
+
+    // Clear any existing reconnect timer
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+    }
+
+    // Calculate delay with exponential backoff
+    const delay = Math.min(
+      this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts),
+      30000 // Max 30 seconds
+    );
+
+    this.reconnectAttempts++;
+    console.log(`Scheduling reconnect attempt ${this.reconnectAttempts} in ${delay}ms`);
+
+    this.reconnectTimer = setTimeout(() => {
+      if (!this.connected) {
+        console.log('Attempting to reconnect...');
+        this.connect(onPriceUpdate, onDisconnect);
+      }
+    }, delay);
+  }
+
   disconnect() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    
     if (this.stompClient && this.connected) {
       this.stompClient.disconnect();
       this.connected = false;
       console.log('Disconnected from WebSocket');
     }
+    
+    // Reset reconnection state
+    this.reconnectAttempts = 0;
   }
 
   isConnected() {

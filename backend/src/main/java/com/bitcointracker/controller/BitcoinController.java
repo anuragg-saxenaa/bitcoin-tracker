@@ -30,6 +30,14 @@ public class BitcoinController {
     public ResponseEntity<List<BitcoinPriceResponse>> getPriceHistory(
             @RequestParam(defaultValue = "24") int hours) {
         try {
+            // Input validation: hours must be between 1 and 168 (7 days)
+            if (hours < 1) {
+                return ResponseEntity.badRequest().build();
+            }
+            if (hours > 168) {
+                hours = 168; // Cap at 7 days to prevent performance issues
+            }
+            
             List<BitcoinPriceResponse> priceHistory = bitcoinService.getPriceHistory(hours);
             return ResponseEntity.ok(priceHistory);
         } catch (Exception e) {
